@@ -1,0 +1,146 @@
+---
+title: "Heart Disease Prediction"
+author: "Bayu Raka Janasri"
+date: "6/20/2021"
+output: 
+  html_document:
+    theme: flatly
+    higlight: zenburn
+    toc: true
+    toc_float:
+      collapsed: true
+    df_print: paged
+    number_sections : True
+---
+# Introduction
+
+![](heart.jpeg)
+
+Heart disease is the leading cause of death in the United States, causing about 1 in 4 deaths. The term “heart disease” refers to several types of heart conditions. In the United States, the most common type of heart disease is coronary artery disease (CAD), which can lead to heart attack. This dataset is from Cleveland which is a major city in the U.S. state of Ohio. At this time we make model for predict heart disease in Cleveland.
+
+Source dataset: https://www.kaggle.com/ronitf/heart-disease-uci
+
+
+# Import Library
+```{r, message=FALSE}
+library(dplyr)
+library(tidyr)
+library(MASS)
+library(caret)
+```
+
+# Read Data
+
+```{r}
+heart <- read.csv("heart.csv", stringsAsFactors = T)
+glimpse(heart)
+```
+Attribute information:
+
+`age` : age.
+
+`sex` : sex.
+
+`cp` : chest pain type (4 values).
+
+`trestbps` : resting blood pressure.
+
+`chol` : serum cholestoral in mg/dl.
+
+`fbs` : fasting blood sugar > 120 mg/dl.
+
+`restecg` : resting electrocardiographic results (values 0,1,2).
+
+`thalach` : maximum heart rate achieved.
+
+`exang` : exercise induced angina.
+
+`oldpeak` : ST depression induced by exercise relative to rest.
+
+`slope` : the slope of the peak exercise ST segment.
+
+`ca`: number of major vessels (0-3) colored by flourosopy.
+
+`thal`: 3 = normal; 6 = fixed defect; 7 = reversable defect.
+
+`target` : 0 = Health ; 1 = Not Health.
+
+# Exploratory Data Analysis
+
+**Change Data Type**
+```{r}
+heart <- heart %>% 
+    mutate_if(is.integer, as.factor) %>% 
+    mutate(target = factor(target, level = c(0,1), labels = c("Health", "Not Health")))
+head(heart)
+```
+
+**Check Missing Value**
+```{r}
+colSums(is.na(heart))
+```
+There is no missing value at our dataset.
+
+**Check Propotional data**
+
+```{r}
+prop.table(table(heart$target))
+```
+We have quite balance data propotion, we can continue next step.
+
+**Cross Validation**
+
+We do splitting our dataset into train and test data. Right now we split our dataset 80% train data and 20% test data.
+
+```{r}
+set.seed(212)
+
+index <- sample(nrow(heart), nrow(heart)*0.8)
+
+heart_train <- heart[index, ]
+heart_test <-  heart[-index, ]
+
+```
+
+# Modelling
+
+We try to build model machine learning to predict heart disease.
+
+## Logistic Regression
+
+```{r}
+model_logistic <- glm(formula = target ~ sex+cp+fbs+exang+oldpeak+slope+ca+thal, 
+                      family = "binomial",
+                      data = heart_train)
+summary(model_logistic)
+```
+## Prediction
+
+```{r}
+heart_test$prob_heart<-predict(model_logistic, type = "response", newdata = heart_test)
+```
+
+```{r}
+ggplot(heart_test, aes(x=prob_heart)) +
+  geom_density(lwd=0.5) +
+  labs(title = "Distribution of Probability Prediction Data") +
+  theme_minimal()
+```
+
+Based on graph above we can see our prediction tend to be 1 that means Not Health.
+
+```{r}
+heart_test$pred_heart <- factor(ifelse(heart_test$prob_heart > 0.5, "Not Health","Health"))
+```
+
+## Evaluation
+
+```{r}
+cm_logis <- confusionMatrix(heart_test$pred_heart, heart_test$target, positive = "Not Health")
+cm_logis
+```
+Based on `confussionMatrix` our result are `Accuracy` **83.6%**, `Sensitivity/Recall` **88.8%**, `Specificity` **76%**, `Precision` **84%** . 
+
+# Conclusion
+
+Our objective is `Sensitivity/Recall` which is **88.8%**. Because we want get **False Positive** as high as possible, our model can be functional as pre-screening for the doctor, eventhough our patient is labeled as positive or not health but doctor can do checking for more details.
